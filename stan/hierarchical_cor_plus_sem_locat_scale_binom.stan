@@ -14,7 +14,6 @@ aria: make_local += STAN_CPP_OPTIMS=true
 // aria: make_local += PRECOMPILED_HEADERS=true
 */
 
-
 functions{
 	// flatten_lower_tri: function that returns the lower-tri of a matrix, flattened to a vector
 	vector flatten_lower_tri(matrix mat) {
@@ -29,23 +28,6 @@ functions{
 			}
 		}
 		return(out) ;
-	}
-
-	array sem_var0_to_var1_and_var2(matrix std_normal_var0, vector cors, matrix std_normal_var1_unique, matrix std_normal_var2_unique){
-		int nrows = rows(std_normal_var0) ;
-		int ncols = cols(std_normal_var0) ;
-		// weight = sqrt(r/(1-r))
-		// x = (latent_common * weight + latent_unique_x) / sqrt( 1+ (weight^2) )
-		// y = (latent_common * weight + latent_unique_y) / sqrt( 1+ (weight^2) )
-		// cor(x,y) # ==r
-		// var(x) # ==1
-		vector[nrows] weights_common = sqrt(cors/(1-cors)) ;
-		vector[nrows] denoms = sqrt( 1 + (weights_common.^2) ) ;
-		array[2] matrix[nrows,ncols] std_normal_var1_var2;
-		matrix[nrows,ncols] var0_times_weight = std_normal_var0 .* rep_matrix(weights_common,ncols) ;
-		std_normal_var1_var2[1] = (var0_times_weight + std_normal_var1_unique) ./ rep_matrix(denoms,ncols) ;
-		std_normal_var1_var2[2] = (var0_times_weight + std_normal_var2_unique) ./ rep_matrix(denoms,ncols) ;
-		return(std_normal_var1_var2) ;
 	}
 
 	matrix sem_var1_to_var2(matrix std_normal_var1, vector cors, matrix std_normal_var2_unique){
@@ -114,16 +96,16 @@ data{
 	// iXc: which individual is associated with each row in Xc
 	array[rXc] int<lower=1,upper=nI> iXc ;
 
-	// nXc1: 
+	// nXc1:
 	int<lower=1> nXc1 ;
 
-	// 
+	//
 	array[nXc1] int Xc1_col_in_Xc ;
 
 	// nXc1:
 	int<lower=1> nXc2 ;
 
-	// 
+	//
 	array[nXc2] int Xc2_col_in_Xc ;
 
 	// nY: num entries in the LA observation vector
@@ -156,7 +138,6 @@ transformed data{
 
 parameters{
 
-	// real<lower=0> T1_locat_intercept_mean ;
 	real T1_locat_intercept_mean ;
 	real<lower=0> T1_locat_intercept_sd ;
 	vector[nXc-1] T1_locat_coef_mean ;
@@ -165,7 +146,6 @@ parameters{
 	matrix[nXc,nI] T1_locat_icoef_indiv_helper ;
 	cholesky_factor_corr[nXc] T1_locat_cholfaccorr ;
 
-	// real<lower=0> T1_scale_intercept_mean ;
 	real T1_scale_intercept_mean ;
 	real<lower=0> T1_scale_intercept_sd ;
 	vector[nXc-1] T1_scale_coef_mean ;
@@ -174,7 +154,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_locat_scale_cors ;
 	matrix[nXc,nI] T1_scale_icoef_indiv_unique ;
 
-	// real<lower=0> T1_binom_intercept_mean ;
 	real T1_binom_intercept_mean ;
 	real<lower=0> T1_binom_intercept_sd ;
 	vector[nXc-1] T1_binom_coef_mean ;
@@ -183,8 +162,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_locat_binom_cors ;
 	matrix[nXc,nI] T1_binom_icoef_indiv_unique ;
 
-
-	// real<lower=0> T2_locat_intercept_mean ;
 	real T2_locat_intercept_mean ;
 	real<lower=0> T2_locat_intercept_sd ;
 	vector[nXc-1] T2_locat_coef_mean ;
@@ -193,7 +170,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_T2_locat_cors ;
 	matrix[nXc,nI] T2_locat_icoef_indiv_unique ;
 
-	// real<lower=0> T2_scale_intercept_mean ;
 	real T2_scale_intercept_mean ;
 	real<lower=0> T2_scale_intercept_sd ;
 	vector[nXc-1] T2_scale_coef_mean ;
@@ -202,7 +178,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_T2_scale_cors ;
 	matrix[nXc,nI] T2_scale_icoef_indiv_unique ;
 
-	// real<lower=0> T2_binom_intercept_mean ;
 	real T2_binom_intercept_mean ;
 	real<lower=0> T2_binom_intercept_sd ;
 	vector[nXc-1] T2_binom_coef_mean ;
@@ -278,56 +253,6 @@ model{
 		) ;
 
 		// SEMs ----
-		matrix[nXc,nI] T1_scale_icoef_indiv_corStdNorms = sem_var1_to_var2(
-			T1_locat_icoef_indiv_corStdNorms // std_normal_var1
-			, T1_locat_scale_cors // cors
-			, T1_scale_icoef_indiv_unique // std_normal_var2_unique
-		) ;
-		matrix[nXc,nI] T1_binom_icoef_indiv_corStdNorms = sem_var1_to_var2(
-			T1_locat_icoef_indiv_corStdNorms // std_normal_var1
-			, T1_locat_binom_cors // cors
-			, T1_binom_icoef_indiv_unique // std_normal_var2_unique
-		) ;
-		matrix[nXc,nI] T2_locat_icoef_indiv_corStdNorms = sem_var1_to_var2(
-			T1_locat_icoef_indiv_corStdNorms // std_normal_var1
-			, T1_T2_locat_cors // cors
-			, T2_locat_icoef_indiv_unique // std_normal_var2_unique
-		) ;
-		matrix[nXc,nI] T2_scale_icoef_indiv_corStdNorms = sem_var1_to_var2(
-			T1_scale_icoef_indiv_corStdNorms // std_normal_var1
-			, T1_T2_scale_cors // cors
-			, T2_scale_icoef_indiv_unique // std_normal_var2_unique
-		) ;
-		matrix[nXc,nI] T2_binom_icoef_indiv_corStdNorms = sem_var1_to_var2(
-			T1_binom_icoef_indiv_corStdNorms // std_normal_var1
-			, T1_T2_binom_cors // cors
-			, T2_binom_icoef_indiv_unique // std_normal_var2_unique
-		) ;
-
-
-		// Shifting & scaling ----
-		matrix[nXc,nI] T1_locat_icoef_indiv = shift_and_scale_cols(
-			T1_locat_icoef_indiv_corStdNorms // std_normal_vals
-			, append_row( T1_locat_intercept_mean , T1_locat_coef_mean ) // shift
-			, append_row( T1_locat_intercept_sd , T1_locat_coef_sd ) // scale
-		) ;
-		matrix[nXc,nI] T1_scale_icoef_indiv = shift_and_scale_cols(
-			T1_scale_icoef_indiv_corStdNorms // std_normal_vals
-			, append_row( T1_scale_intercept_mean , T1_scale_coef_mean ) // shift
-			, append_row( T1_scale_intercept_sd , T1_scale_coef_sd ) // scale
-		) ;
-		matrix[nXc,nI] T1_binom_icoef_indiv = shift_and_scale_cols(
-			T1_binom_icoef_indiv_corStdNorms // std_normal_vals
-			, append_row( T1_binom_intercept_mean , T1_binom_coef_mean ) // shift
-			, append_row( T1_binom_intercept_sd , T1_binom_coef_sd ) // binom
-		) ;
-		matrix[nXc,nI] T2_locat_icoef_indiv = shift_and_scale_cols(
-			T2_locat_icoef_indiv_corStdNorms // std_normal_vals
-			, append_row( T2_locat_intercept_mean , T2_locat_coef_mean ) // shift
-			, append_row( T2_locat_intercept_sd , T2_locat_coef_sd ) // scale
-		) ;
-		matrix[nXc,nI] T2_scale_icoef_indiv = shift_and_scale_cols(
-			T2_scale_icoef_indiv_corStdNorms // std_normal_vals
 		matrix[nXc,nI] T1_scale_icoef_indiv_corStdNorms = sem_var1_to_var2(
 			T1_locat_icoef_indiv_corStdNorms // std_normal_var1
 			, T1_locat_scale_cors // cors

@@ -124,7 +124,6 @@ transformed data{
 
 parameters{
 
-	// real<lower=0> T1_locat_intercept_mean ;
 	real T1_locat_intercept_mean ;
 	real<lower=0> T1_locat_intercept_sd ;
 	vector[nXc-1] T1_locat_coef_mean ;
@@ -133,7 +132,6 @@ parameters{
 	matrix[nXc,nI] T1_locat_icoef_indiv_helper ;
 	cholesky_factor_corr[nXc] T1_locat_cholfaccorr ;
 
-	// real<lower=0> T1_scale_intercept_mean ;
 	real T1_scale_intercept_mean ;
 	real<lower=0> T1_scale_intercept_sd ;
 	vector[nXc-1] T1_scale_coef_mean ;
@@ -142,7 +140,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_locat_scale_cors ;
 	matrix[nXc,nI] T1_scale_icoef_indiv_unique ;
 
-	// real<lower=0> T1_binom_intercept_mean ;
 	real T1_binom_intercept_mean ;
 	real<lower=0> T1_binom_intercept_sd ;
 	vector[nXc-1] T1_binom_coef_mean ;
@@ -151,8 +148,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_locat_binom_cors ;
 	matrix[nXc,nI] T1_binom_icoef_indiv_unique ;
 
-
-	// real<lower=0> T2_locat_intercept_mean ;
 	real T2_locat_intercept_mean ;
 	real<lower=0> T2_locat_intercept_sd ;
 	vector[nXc-1] T2_locat_coef_mean ;
@@ -161,7 +156,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_T2_locat_cors ;
 	matrix[nXc,nI] T2_locat_icoef_indiv_unique ;
 
-	// real<lower=0> T2_scale_intercept_mean ;
 	real T2_scale_intercept_mean ;
 	real<lower=0> T2_scale_intercept_sd ;
 	vector[nXc-1] T2_scale_coef_mean ;
@@ -170,7 +164,6 @@ parameters{
 	vector<lower=-1,upper=1>[nXc] T1_T2_scale_cors ;
 	matrix[nXc,nI] T2_scale_icoef_indiv_unique ;
 
-	// real<lower=0> T2_binom_intercept_mean ;
 	real T2_binom_intercept_mean ;
 	real<lower=0> T2_binom_intercept_sd ;
 	vector[nXc-1] T2_binom_coef_mean ;
