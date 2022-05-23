@@ -96,18 +96,6 @@ data{
 	// iXc: which individual is associated with each row in Xc
 	array[rXc] int<lower=1,upper=nI> iXc ;
 
-	// nXc1:
-	int<lower=1> nXc1 ;
-
-	//
-	array[nXc1] int Xc1_col_in_Xc ;
-
-	// nXc1:
-	int<lower=1> nXc2 ;
-
-	//
-	array[nXc2] int Xc2_col_in_Xc ;
-
 	// nY: num entries in the LA observation vector
 	int nY ;
 
