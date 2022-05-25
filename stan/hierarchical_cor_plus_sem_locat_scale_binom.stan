@@ -2,7 +2,7 @@
 TODO:
 - sufficient-stats trick for bernoulli
 - sufficient-stats trick for normal for cells with >2 observations (requires jacobian if there's also cells with 1 observation)
-- currently assumes equal number of observations in time
+- currently assumes equal number of observations in time for the two response types
 - accellerate likelihood by pulling it out of the loop over time & indexing
 - conditional permitting either serial likelihood or reduce-sum
 - accellerate prior target incrementing by bundling variables with the same prior & adding a reduce-sum option
@@ -152,24 +152,18 @@ parameters{
 
 	vector<lower=0,upper=1>[nXc] T1_T2_locat_cors ;
 	array[2] matrix[nXc,nI] T1_T2_locat_icoef_unique_std_normals ;
-	row_vector[2] T1_T2_locat_intercept_mean ;
-	matrix[nXc-1,2] T1_T2_locat_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_locat_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_locat_coef_sd ;
+	matrix[nXc,2] T1_T2_locat_coef_mean ;
+	matrix<lower=0>[nXc,2] T1_T2_locat_coef_sd ;
 
 	vector<lower=-1,upper=1>[nXc] locat_scale_cors ;
 	array[2] matrix[nXc,nI] T1_T2_scale_icoef_unique_std_normals ;
-	row_vector[2] T1_T2_scale_intercept_mean ;
-	matrix[nXc-1,2] T1_T2_scale_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_scale_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_scale_coef_sd ;
+	matrix[nXc,2] T1_T2_scale_coef_mean ;
+	matrix<lower=0>[nXc,2] T1_T2_scale_coef_sd ;
 
 	vector<lower=-1,upper=1>[nXc] locat_binom_cors ;
 	array[2] matrix[nXc,nI] T1_T2_binom_icoef_unique_std_normals ;
-	row_vector[2] T1_T2_binom_intercept_mean ;
-	matrix[nXc-1,2] T1_T2_binom_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_binom_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_binom_coef_sd ;
+	matrix[nXc,2] T1_T2_binom_coef_mean ;
+	matrix<lower=0>[nXc,2] T1_T2_binom_coef_sd ;
 
 
 }
@@ -184,8 +178,6 @@ model{
 		to_vector(T1_T2_locat_icoef_unique_std_normals[1]) ~ std_normal() ;
 		to_vector(T1_T2_locat_icoef_unique_std_normals[2]) ~ std_normal() ;
 
-		T1_T2_locat_intercept_mean ~ std_normal() ;
-		T1_T2_locat_intercept_sd ~ weibull(2,1) ;
 		to_vector(T1_T2_locat_coef_mean) ~ std_normal() ;
 		to_vector(T1_T2_locat_coef_sd) ~ weibull(2,1) ;
 
@@ -193,8 +185,6 @@ model{
 		// locat_scale_cors ~ uniform(-1,1) ; //commented-out bc implied by bounds
 		to_vector(T1_T2_scale_icoef_unique_std_normals[1]) ~ std_normal() ;
 		to_vector(T1_T2_scale_icoef_unique_std_normals[2]) ~ std_normal() ;
-		T1_T2_scale_intercept_mean ~ std_normal() ;
-		T1_T2_scale_intercept_sd ~ weibull(2,1) ;
 		to_vector(T1_T2_scale_coef_mean) ~ std_normal() ;
 		to_vector(T1_T2_scale_coef_sd) ~ weibull(2,1) ;
 
@@ -202,8 +192,6 @@ model{
 		// locat_binom_cors ~ uniform(-1,1) ; //commented-out bc implied by bounds
 		to_vector(T1_T2_binom_icoef_unique_std_normals[1]) ~ std_normal() ;
 		to_vector(T1_T2_binom_icoef_unique_std_normals[2]) ~ std_normal() ;
-		T1_T2_binom_intercept_mean ~ std_normal() ;
-		T1_T2_binom_intercept_sd ~ weibull(2,1) ;
 		to_vector(T1_T2_binom_coef_mean) ~ std_normal() ;
 		to_vector(T1_T2_binom_coef_sd) ~ weibull(2,1) ;
 
@@ -235,8 +223,8 @@ model{
 			// locat just needs shift & scale
 			T1_T2_locat_icoef[t] = shift_and_scale_cols(
 				T1_T2_locat_icoef_corStdNorms[t] // std_normal_vals
-				, append_row( T1_T2_locat_intercept_mean[t] , T1_T2_locat_coef_mean[,t] ) // shift
-				, append_row( T1_T2_locat_intercept_sd[t]   , T1_T2_locat_coef_sd[,t] ) // scale
+				, T1_T2_locat_coef_mean[,t] // shift
+				, T1_T2_locat_coef_sd[,t] // scale
 			) ;
 			// scale needs SEM from locat, then shift & scale
 			T1_T2_scale_icoef[t] = shift_and_scale_cols(
@@ -245,8 +233,8 @@ model{
 					, locat_scale_cors // cors
 					, T1_T2_scale_icoef_unique_std_normals[t] // std_normal_var2_unique
 				) // std_normal_vals
-				, append_row( T1_T2_scale_intercept_mean[t] , T1_T2_scale_coef_mean[,t] ) // shift
-				, append_row( T1_T2_scale_intercept_sd[t]   , T1_T2_scale_coef_sd[,t] ) // scale
+				, T1_T2_scale_coef_mean[,t] // shift
+				, T1_T2_scale_coef_sd[,t] // scale
 			) ;
 			// binom needs SEM from locat, then shift & scale
 			T1_T2_binom_icoef[t] = shift_and_scale_cols(
@@ -255,8 +243,8 @@ model{
 					, locat_binom_cors // cors
 					, T1_T2_binom_icoef_unique_std_normals[2] // std_normal_var2_unique
 				) // std_normal_vals
-				, append_row( T1_T2_binom_intercept_mean[t] , T1_T2_binom_coef_mean[,t] ) // shift
-				, append_row( T1_T2_binom_intercept_sd[t] , T1_T2_binom_coef_sd[,t] ) // binom
+				, T1_T2_binom_coef_mean[,t] // shift
+				, T1_T2_binom_coef_sd[,t] // binom
 			) ;
 			// dot products to go from coef to cond
 			T1_T2_locat_icond[t,] = columns_dot_product(	T1_T2_locat_icoef[t][,iXc] , Xct ) ;
@@ -276,14 +264,11 @@ model{
 generated quantities{
 
 	// cors: lower-tri of correlation matrix flattened to a vector
-	vector[(nXc*(nXc-1))%/%2] locat_cors = flatten_lower_tri(multiply_lower_tri_self_transpose(locat_cholfaccorr)) ;
-	real locat_intercept_mean = mean(T1_T2_locat_intercept_mean) ;
-	real scale_intercept_mean = mean(T1_T2_scale_intercept_mean) ;
-	real binom_intercept_mean = mean(T1_T2_binom_intercept_mean) ;
-	vector[nXc-1] locat_coef_mean ;
-	vector[nXc-1] scale_coef_mean ;
-	vector[nXc-1] binom_coef_mean ;
-	for(x in 1:(nXc-1)){
+	vector[(nXc*(nXc))%/%2] locat_cors = flatten_lower_tri(multiply_lower_tri_self_transpose(locat_cholfaccorr)) ;
+	vector[nXc] locat_coef_mean ;
+	vector[nXc] scale_coef_mean ;
+	vector[nXc] binom_coef_mean ;
+	for(x in 1:(nXc)){
 		locat_coef_mean[x] = mean(T1_T2_locat_coef_mean[x,]);
 		scale_coef_mean[x] = mean(T1_T2_scale_coef_mean[x,]);
 		binom_coef_mean[x] = mean(T1_T2_binom_coef_mean[x,]);

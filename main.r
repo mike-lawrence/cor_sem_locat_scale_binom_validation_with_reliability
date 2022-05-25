@@ -14,7 +14,9 @@ enable_rstudio_stan_syntax_check()
 #start parallel compile jobs in the background
 compile_stan_files_as_parallel_jobs(path='stan')
 
-#start a ramdisk (Mac/linux only, will ask for sudo password)
+#start a ramdisk (Mac/linux only)
+# Note: will ask for sudo password, but it's not permanently; see `open(r_helpers/start_ramdisk.r)`
+# Also note: ramdisk may even be *slower*; still working out why...
 #start_ramdisk(gb=10)
 
 

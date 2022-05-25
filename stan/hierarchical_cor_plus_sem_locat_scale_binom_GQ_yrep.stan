@@ -1,19 +1,3 @@
-/*
-aria: compile = 1
-aria: make_local += STAN_NO_RANGE_CHECKS=true
-aria: make_local += STAN_CPP_OPTIMS=true
-// aria: make_local += CXXFLAGS+=-mtune=native
-// aria: make_local += CXXFLAGS+=-march=native
-// aria: make_local += STANCFLAGS+=--O1
-// aria: make_local += CXXFLAGS+=-O3
-// aria: make_local += CXXFLAGS+=-g0
-// aria: make_local += STAN_NO_RANGE_CHECKS=true
-// aria: make_local += STAN_CPP_OPTIMS=true
-// aria: make_local += STANCFLAGS+=--O1
-// aria: make_local += STANCFLAGS+=--Oexperimental
-// aria: make_local += PRECOMPILED_HEADERS=true
-*/
-
 functions{
 	// flatten_lower_tri: function that returns the lower-tri of a matrix, flattened to a vector
 	vector flatten_lower_tri(matrix mat) {
@@ -157,24 +141,18 @@ parameters{
 
 	vector<lower=0,upper=1>[nXc] T1_T2_locat_cors ;
 	array[2] matrix[nXc,nI] T1_T2_locat_icoef_unique_std_normals ;
-	row_vector[2] T1_T2_locat_intercept_mean ;
-	matrix[nXc-1,2] T1_T2_locat_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_locat_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_locat_coef_sd ;
+	matrix[nXc,2] T1_T2_locat_coef_mean ;
+	matrix<lower=0>[nXc,2] T1_T2_locat_coef_sd ;
 
 	vector<lower=-1,upper=1>[nXc] locat_scale_cors ;
 	array[2] matrix[nXc,nI] T1_T2_scale_icoef_unique_std_normals ;
-	row_vector[2] T1_T2_scale_intercept_mean ;
-	matrix[nXc-1,2] T1_T2_scale_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_scale_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_scale_coef_sd ;
+	matrix[nXc,2] T1_T2_scale_coef_mean ;
+	matrix<lower=0>[nXc,2] T1_T2_scale_coef_sd ;
 
 	vector<lower=-1,upper=1>[nXc] locat_binom_cors ;
 	array[2] matrix[nXc,nI] T1_T2_binom_icoef_unique_std_normals ;
-	row_vector[2] T1_T2_binom_intercept_mean ;
-	matrix[nXc-1,2] T1_T2_binom_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_binom_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_binom_coef_sd ;
+	matrix[nXc,2] T1_T2_binom_coef_mean ;
+	matrix<lower=0>[nXc,2] T1_T2_binom_coef_sd ;
 
 
 }
@@ -212,8 +190,8 @@ generated quantities{
 			// locat just needs shift & scale
 			T1_T2_locat_icoef[t] = shift_and_scale_cols(
 				T1_T2_locat_icoef_corStdNorms[t] // std_normal_vals
-				, append_row( T1_T2_locat_intercept_mean[t] , T1_T2_locat_coef_mean[,t] ) // shift
-				, append_row( T1_T2_locat_intercept_sd[t]   , T1_T2_locat_coef_sd[,t] ) // scale
+				, T1_T2_locat_coef_mean[,t] // shift
+				, T1_T2_locat_coef_sd[,t] // scale
 			) ;
 			// scale needs SEM from locat, then shift & scale
 			T1_T2_scale_icoef[t] = shift_and_scale_cols(
@@ -222,8 +200,8 @@ generated quantities{
 					, locat_scale_cors // cors
 					, T1_T2_scale_icoef_unique_std_normals[t] // std_normal_var2_unique
 				) // std_normal_vals
-				, append_row( T1_T2_scale_intercept_mean[t] , T1_T2_scale_coef_mean[,t] ) // shift
-				, append_row( T1_T2_scale_intercept_sd[t]   , T1_T2_scale_coef_sd[,t] ) // scale
+				, T1_T2_scale_coef_mean[,t] // shift
+				, T1_T2_scale_coef_sd[,t] // scale
 			) ;
 			// binom needs SEM from locat, then shift & scale
 			T1_T2_binom_icoef[t] = shift_and_scale_cols(
@@ -232,8 +210,8 @@ generated quantities{
 					, locat_binom_cors // cors
 					, T1_T2_binom_icoef_unique_std_normals[2] // std_normal_var2_unique
 				) // std_normal_vals
-				, append_row( T1_T2_binom_intercept_mean[t] , T1_T2_binom_coef_mean[,t] ) // shift
-				, append_row( T1_T2_binom_intercept_sd[t]   , T1_T2_binom_coef_sd[,t] ) // binom
+				, T1_T2_binom_coef_mean[,t] // shift
+				, T1_T2_binom_coef_sd[,t] // binom
 			) ;
 			// dot products to go from coef to cond
 			T1_T2_locat_icond[t,] = columns_dot_product(  T1_T2_locat_icoef[t][,iXc] , Xct ) ;
