@@ -208,7 +208,7 @@ generated quantities{
 				sem_var1_to_var2(
 					T1_T2_locat_icoef_corStdNorms[t] // std_normal_var1
 					, locat_binom_cors // cors
-					, T1_T2_binom_icoef_unique_std_normals[2] // std_normal_var2_unique
+					, T1_T2_binom_icoef_unique_std_normals[t] // std_normal_var2_unique
 				) // std_normal_vals
 				, T1_T2_binom_coef_mean[,t] // shift
 				, T1_T2_binom_coef_sd[,t] // binom
