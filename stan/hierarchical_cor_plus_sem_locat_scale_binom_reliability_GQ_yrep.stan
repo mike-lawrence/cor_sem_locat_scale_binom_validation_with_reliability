@@ -149,12 +149,16 @@ parameters{
 	matrix[nXc,2] T1_T2_scale_coef_mean ;
 	matrix<lower=0>[nXc,2] T1_T2_scale_coef_sd ;
 
-	vector<lower=-1,upper=1>[nXc] locat_binom_cors ;
+	// vector<lower=-1,upper=1>[nXc] locat_binom_cors ;
+	real<lower=0,upper=1> locat_binom_cors_intercept ;
+	vector<lower=-1,upper=1>[nXc-1] locat_binom_cors_others ;
 	array[2] matrix[nXc,nI] T1_T2_binom_icoef_unique_std_normals ;
 	matrix[nXc,2] T1_T2_binom_coef_mean ;
 	matrix<lower=0>[nXc,2] T1_T2_binom_coef_sd ;
 
-
+}
+transformed parameters{
+	vector[nXc] locat_binom_cors = append_row(locat_binom_cors_intercept,locat_binom_cors_others) ;
 }
 generated quantities{
 	// T1_T2_Y_gauss_rep: posterior-predictive observations modelled with location-scale Gaussian model

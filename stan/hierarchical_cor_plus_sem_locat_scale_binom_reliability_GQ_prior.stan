@@ -153,7 +153,9 @@ generated quantities{
 	matrix[nXc,2] T1_T2_scale_coef_mean ;
 	matrix[nXc,2] T1_T2_scale_coef_sd ;
 
-	vector[nXc] locat_binom_cors ;
+	vector<lower=-1,upper=1>[nXc] locat_binom_cors ;
+	real<lower=0,upper=1> locat_binom_cors_intercept ;
+	vector<lower=-1,upper=1>[nXc-1] locat_binom_cors_others ;
 	array[2] matrix[nXc,nI] T1_T2_binom_icoef_unique_std_normals ;
 	matrix[nXc,2] T1_T2_binom_coef_mean ;
 	matrix[nXc,2] T1_T2_binom_coef_sd ;
@@ -161,10 +163,13 @@ generated quantities{
 	locat_cholfaccorr = lkj_corr_cholesky_rng(nXc,1.0) ;
 
 	for(x in 1:nXc){
-		T1_T2_locat_cors[x] = uniform_rng(0,1) ; //commented-out bc implied by bounds
-		locat_scale_cors[x] = uniform_rng(-1,1) ; //commented-out bc implied by bounds
-		locat_binom_cors[x] = uniform_rng(-1,1) ; //commented-out bc implied by bounds
+		T1_T2_locat_cors[x] = uniform_rng(0,1) ;
+		locat_scale_cors[x] = uniform_rng(-1,1) ;
+		locat_binom_cors[x] = uniform_rng(-1,1) ;
 	}
+	locat_binom_cors_intercept = locat_binom_cors[1] ;
+	locat_binom_cors_others = locat_binom_cors[2:nXc] ;
+
 
 	for(t in 1:2){
 		for(x in 1:nXc){
