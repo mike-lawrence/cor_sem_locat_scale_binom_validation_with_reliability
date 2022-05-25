@@ -112,7 +112,7 @@ data{
 	// iXc: which individual is associated with each row in Xc
 	array[rXc] int<lower=1,upper=nI> iXc ;
 
-	// nY: num entries in the LA observation vector
+	// nY: num entries in the observation vector
 	int nY ;
 
 	// T1_T2_Y_gauss: observations modelled with location-scale Gaussian model

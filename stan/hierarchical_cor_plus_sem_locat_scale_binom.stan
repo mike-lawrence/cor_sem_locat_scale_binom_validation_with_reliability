@@ -125,7 +125,7 @@ data{
 	// iXc: which individual is associated with each row in Xc
 	array[rXc] int<lower=1,upper=nI> iXc ;
 
-	// nY: num entries in the LA observation vector
+	// nY: num entries in the observation vector
 	int nY ;
 
 	// T1_T2_Y_gauss: observations modelled with location-scale Gaussian model
@@ -264,7 +264,7 @@ model{
 generated quantities{
 
 	// cors: lower-tri of correlation matrix flattened to a vector
-	vector[(nXc*(nXc))%/%2] locat_cors = flatten_lower_tri(multiply_lower_tri_self_transpose(locat_cholfaccorr)) ;
+	vector[(nXc*(nXc-1))%/%2] locat_cors = flatten_lower_tri(multiply_lower_tri_self_transpose(locat_cholfaccorr)) ;
 	vector[nXc] locat_coef_mean ;
 	vector[nXc] scale_coef_mean ;
 	vector[nXc] binom_coef_mean ;
