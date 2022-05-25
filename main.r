@@ -140,14 +140,14 @@ data_for_stan = lst(
 
 
 # Sample the prior (the easy way, using explicit rng functions in GQ) ----
-prior_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_GQ_prior.stan')
+prior_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_reliability_GQ_prior.stan')
 prior_post = prior_mod$generate_quantities(
 	data = data_for_stan
 	, fitted_params = posterior::draws_array(dummy=0)
 )
 
 # Sample the prior (the hard/thorough way that checks that the sampler can sample the prior implicitly without pathology) ----
-sampling_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom.stan')
+sampling_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_reliability.stan')
 prior_post = sample_mod(
 	# data = data_for_stan
 	data = (
@@ -184,6 +184,8 @@ prior_post_draw_for_predictive %<>% (
 	%>% posterior::as_draws_list()
 	%>% pluck(1)
 	%>% {function(x){
+		x %<>% assign_in(paste0('locat_binom_cors[1]'),.8)
+		x %<>% assign_in(paste0('locat_binom_cors_intercept'),.8)
 		for(i in 1:data_for_stan$nXc){
 			x %<>% assign_in(paste0('T1_T2_locat_cors[',i,']'),.8)
 		}
@@ -194,7 +196,7 @@ prior_post_draw_for_predictive %<>% (
 
 
 # Generate yreps from the prior draw & assign into data_for_stan ----
-predictive_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_GQ_yrep.stan')
+predictive_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_reliability_GQ_yrep.stan')
 data_for_stan %<>% (
 	.
 	%>% predictive_mod$generate_quantities(
@@ -215,7 +217,7 @@ data_for_stan %<>% (
 
 
 # sample given the prior & prior-predictive data ----
-sampling_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom.stan')
+sampling_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_reliability.stan')
 post = sample_mod(
 	data = (
 		data_for_stan
@@ -260,7 +262,7 @@ plot_par(
 
 
 # posterior predictive check ----
-predictive_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_GQ_yrep.stan')
+predictive_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_reliability_GQ_yrep.stan')
 
 post_predictive = predictive_mod$generate_quantities(
 	data = data_for_stan
