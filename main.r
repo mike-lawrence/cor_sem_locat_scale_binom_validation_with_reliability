@@ -178,7 +178,8 @@ print(attr(prior_post,'dd')$sampler_diagnostics_across_chain_summary)
 ) ->
 	prior_post_draw_for_predictive
 
-# tweak the reliabilities to be moderate-high:
+# tweak the reliabilities to be high
+# also tweak the correlation for the between locat & binom intercepts to be high
 prior_post_draw_for_predictive %<>% (
 	.
 	%>% posterior::as_draws_list()
