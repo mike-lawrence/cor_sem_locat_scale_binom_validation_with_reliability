@@ -5,6 +5,7 @@ source('_imports.r')
 
 # load tidyverse and a magrittr pipe
 library(tidyverse)
+`%>%` = magrittr::pipe_eager_lexical
 `%<>%` = magrittr::`%<>%`
 
 #make RStudio use cmdstan for syntax checking
@@ -13,14 +14,21 @@ enable_rstudio_stan_syntax_check()
 #start parallel compile jobs in the background
 compile_stan_files_as_parallel_jobs(path='stan')
 
+#start a ramdisk (Mac/linux only, will ask for sudo password)
+#start_ramdisk(gb=10)
+
+
 # generate the data structure ----
-nI = 30
-reps = 30
+
+#nI=60 & reps=10 takes about 5mins to sample
+nI = 60
+reps = 10
 
 (
 	expand_grid(
 		id = 1:nI
 		, ab = factor(c('A','B'))
+		, cd = factor(c('C','D'))
 		, rep = 1:reps
 	)
 	%>% mutate(
@@ -40,7 +48,7 @@ reps = 30
 	%>% mutate(
 		contrasts = get_contrast_matrix_rows_as_list(
 			data = .
-			, formula = ~ ab
+			, formula = ~ ab*cd
 			, contrast_kind = halfsum_contrasts
 		)
 	)
@@ -77,21 +85,21 @@ data_for_stan = lst(
 		%>% as.numeric()
 	)
 
-	# T1_Y_gauss: observations modelled with location-scale Gaussian model
-	# vector[nY] T1_Y_gauss ;
-	, T1_Y_gauss = dat$t1_y_gauss
+	# T1_T2_Y_gauss: observations modelled with location-scale Gaussian model
+	# matrix[nY,2] T1_T2_Y_gauss ;
+	, T1_T2_Y_gauss = (
+		dat
+		%>% select(t1_y_gauss,t2_y_gauss)
+		%>% as.matrix()
+	)
 
-	# T1_Y_binom: observations modelled with binomial model
-	# array[nY] int<lower=0,upper=1> T1_Y_binom ;
-	, T1_Y_binom = dat$t1_y_binom
-
-	# T2_Y_gauss: observations modelled with location-scale Gaussian model
-	# vector[nY] T2_Y_gauss ;
-	, T2_Y_gauss = dat$t2_y_gauss
-
-	# T2_Y_binom: observations modelled with binomial model
-	# array[nY] int<lower=0,upper=1> T2_Y_binom ;
-	, T2_Y_binom = dat$t2_y_binom
+	# T1_T2_Y_binom: observations modelled with binomial model
+	# array[nY,2] int<lower=0,upper=1> T1_T2_Y_binom ;
+	, T1_T2_Y_binom = (
+		dat
+		%>% select(t1_y_binom,t2_y_binom)
+		%>% as.matrix()
+	)
 
 	# yXc: which row in Xc is associated with each observation in Y
 	# array[nY] int<lower=1,upper=rXc> yXc ;
@@ -124,89 +132,100 @@ data_for_stan = lst(
 
 	# nY: num entries in the LA observation vector
 	# int nY ;
-	, nY = length(T1_Y_gauss)
+	, nY = nrow(T1_T2_Y_gauss)
 
 )
 
 
-# Sample the prior ----
-data_for_stan$prior_informed = 1
-data_for_stan$likelihood_informed = 0
-
-# load the sampling model (make sure compile jobs were successful!)
-mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom.stan')
-
-prior_predictive_output = sample_mod(
+# Sample the prior (the easy way, using explicit rng functions in GQ) ----
+prior_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_GQ_prior.stan')
+prior_post = prior_mod$generate_quantities(
 	data = data_for_stan
-	, mod = mod
-	, max_treedepth = 11 # 10 is default
-	, refresh_perc = 10
-	, init = 2 # default of 2 is good for Gaussian likelihoods, lower may be necessary for binomial
+	, fitted_params = posterior::draws_array(dummy=0)
 )
 
-#check diagnostics (added as an attr; really should subclass instead)
-prior_predictive_output %<>% add_draws_and_diagnostics_attr()
-print(attr(prior_predictive_output,'dd')$sampler_diagnostics_across_chain_summary)
+# Sample the prior (the hard/thorough way that checks that the sampler can sample the prior implicitly without pathology) ----
+sampling_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom.stan')
+prior_post = sample_mod(
+	# data = data_for_stan
+	data = (
+		data_for_stan
+		%>% list_modify(
+			prior_informed = 1
+			, likelihood_informed = 0
+		)
+	)
+	, mod = sampling_mod
+	, preset = 'frugal'
+	, precent = 10 # `percent=1`==`refresh=1``; `percent=Inf`==`refresh=0`
+	# , output_dir = '~/temp'
+)
+#check diagnostics
+prior_post %<>% add_draws_and_diagnostics_attr()
+print(attr(prior_post,'dd')$sampler_diagnostics_across_chain_summary)
 (
-	attr(prior_predictive_output,'dd')$par_summary
+	attr(prior_post,'dd')$par_summary
 	%>% select(rhat,contains('ess'))
 	%>% summary()
 )
 
-# Generate yreps from a single prior draw ----
-gq_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_GQ_yrep.stan')
-
+# extract a single prior draw for predictive GQ ----
 (
-	attr(prior_predictive_output,'dd')$draws
-	%>% filter(.draw==1)
-	%>% posterior::as_draws_array()
+	prior_post$draws(inc_warmup = F)
+	%>% posterior::subset_draws(draw=1)
 ) ->
-	prior_predictive_draw_for_yrep
+	prior_post_draw_for_predictive
 
-prior_predictive_draw_gq = gq_mod$generate_quantities(
-	data = data_for_stan
-	, fitted_params = prior_predictive_draw_for_yrep
+# tweak the reliabilities to be moderate-high:
+prior_post_draw_for_predictive %<>% (
+	.
+	%>% posterior::as_draws_list()
+	%>% pluck(1)
+	%>% {function(x){
+		for(i in 1:data_for_stan$nXc){
+			x %<>% assign_in(paste0('T1_T2_locat_cors[',i,']'),.8)
+		}
+		return(x)
+	}}()
+	%>% posterior::as_draws_array()
 )
 
-(
-	prior_predictive_draw_gq$draws(format='draws_df')
-	%>% as_tibble()
-	%>% select(
-		.chain,.iteration,.draw
-		, contains('Y_gauss_rep')
-		, contains('Y_binom_rep')
-	)
-	%>% pivot_longer(
-		cols = -c(.chain,.iteration,.draw)
-		, names_to = 'variable'
-	)
-	%>% separate(
-		variable
-		, into=c('variable','index','dummy')
-		, sep=c('[\\[\\]]')
-		, fill = 'right'
-		, convert = TRUE
-	)
-	%>% select(-dummy,-.chain,-.iteration,-.draw)
-	%>% arrange(variable,index)
-	%>% pivot_wider(names_from=variable)
-) ->
-	prior_predictive_draw_yreps
 
-data_for_stan$T1_Y_gauss = prior_predictive_draw_yreps$T1_Y_gauss_rep
-data_for_stan$T1_Y_binom = prior_predictive_draw_yreps$T1_Y_binom_rep
-data_for_stan$T2_Y_gauss = prior_predictive_draw_yreps$T2_Y_gauss_rep
-data_for_stan$T2_Y_binom = prior_predictive_draw_yreps$T2_Y_binom_rep
+# Generate yreps from the prior draw & assign into data_for_stan ----
+predictive_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_GQ_yrep.stan')
+data_for_stan %<>% (
+	.
+	%>% predictive_mod$generate_quantities(
+		fitted_params = prior_post_draw_for_predictive
+	)
+	%>% {function(x){
+		x$draws(variables = c('T1_T2_Y_gauss_rep','T1_T2_Y_binom_rep'))
+	}}()
+	%>% posterior::as_draws_rvars()
+	%>% {function(x){(
+		data_for_stan
+		%>% list_modify(
+			T1_T2_Y_gauss = posterior::E(x$T1_T2_Y_gauss_rep)
+			, T1_T2_Y_binom = posterior::E(x$T1_T2_Y_binom_rep)
+		)
+	)}}()
+)
 
-# sample given the yrep of the prior draw ----
-data_for_stan$likelihood_informed = 1
 
+# sample given the prior & prior-predictive data ----
+sampling_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom.stan')
 post = sample_mod(
-	data = data_for_stan
-	, mod = mod
-	, max_treedepth = 11 # 10 is default
-	, refresh_perc = 10
-	, init = 2
+	data = (
+		data_for_stan
+		%>% list_modify(
+			prior_informed = 1
+			, likelihood_informed = 1
+		)
+	)
+	, mod = sampling_mod
+	, preset = 'frugal'
+	, precent = 10 # `percent=1`==`refresh=1``; `percent=Inf`==`refresh=0`
+	# , output_dir = '~/temp'
 )
 
 #check diagnostics
@@ -218,31 +237,39 @@ print(attr(post,'dd')$sampler_diagnostics_across_chain_summary)
 	%>% summary()
 )
 
-# plot_par(
-# 	par=c('locat_intercept_mean','locat_coef_mean')
-# 	, true = prior_predictive_draw_for_yrep
-# )
-
 plot_par(
 	post
 	, par_subst = '_mean'
-	, true = prior_predictive_draw_for_yrep
+	, true = prior_post_draw_for_predictive
 )
 
 plot_par(
 	post
 	, par_subst = '_sd'
-	, true = prior_predictive_draw_for_yrep
+	, true = prior_post_draw_for_predictive
 )
 
 
-# plot_par(
-# 	par = 'locat_cors'
-# 	, true = prior_predictive_draw_for_yrep
-# )
 plot_par(
 	post
 	, par_substr = 'cors'
-	, true = prior_predictive_draw_for_yrep
+	, true = prior_post_draw_for_predictive
 )
 
+
+# posterior predictive check ----
+predictive_mod = cmdstanr::cmdstan_model('stan/hierarchical_cor_plus_sem_locat_scale_binom_GQ_yrep.stan')
+
+post_predictive = predictive_mod$generate_quantities(
+	data = data_for_stan
+	, fitted_params = post$draws()
+)
+
+(
+	c('T1_T2_Y_gauss_rep','T1_T2_Y_binom_rep')
+	%>% post_predictive$draws()
+	%>% posterior::as_draws_rvars()
+) ->
+	post_predictive_rep_draws
+
+#todo: finish posterior predictive check

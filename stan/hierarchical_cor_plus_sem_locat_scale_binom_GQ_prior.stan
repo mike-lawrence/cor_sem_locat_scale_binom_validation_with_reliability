@@ -151,107 +151,79 @@ transformed data{
 }
 
 parameters{
+	real dummy ;
+}
 
-	cholesky_factor_corr[nXc] locat_cholfaccorr ;
+generated quantities{
+
+	matrix[nXc,nXc] locat_cholfaccorr ;
 	matrix[nXc,nI] locat_icoef_common_std_normals ;
 
-	vector<lower=0,upper=1>[nXc] T1_T2_locat_cors ;
+	vector[nXc] T1_T2_locat_cors ;
 	array[2] matrix[nXc,nI] T1_T2_locat_icoef_unique_std_normals ;
 	row_vector[2] T1_T2_locat_intercept_mean ;
 	matrix[nXc-1,2] T1_T2_locat_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_locat_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_locat_coef_sd ;
+	row_vector[2] T1_T2_locat_intercept_sd ;
+	matrix[nXc-1,2] T1_T2_locat_coef_sd ;
 
-	vector<lower=-1,upper=1>[nXc] locat_scale_cors ;
+	vector[nXc] locat_scale_cors ;
 	array[2] matrix[nXc,nI] T1_T2_scale_icoef_unique_std_normals ;
 	row_vector[2] T1_T2_scale_intercept_mean ;
 	matrix[nXc-1,2] T1_T2_scale_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_scale_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_scale_coef_sd ;
+	row_vector[2] T1_T2_scale_intercept_sd ;
+	matrix[nXc-1,2] T1_T2_scale_coef_sd ;
 
-	vector<lower=-1,upper=1>[nXc] locat_binom_cors ;
+	vector[nXc] locat_binom_cors ;
 	array[2] matrix[nXc,nI] T1_T2_binom_icoef_unique_std_normals ;
 	row_vector[2] T1_T2_binom_intercept_mean ;
 	matrix[nXc-1,2] T1_T2_binom_coef_mean ;
-	row_vector<lower=0>[2] T1_T2_binom_intercept_sd ;
-	matrix<lower=0>[nXc-1,2] T1_T2_binom_coef_sd ;
+	row_vector[2] T1_T2_binom_intercept_sd ;
+	matrix[nXc-1,2] T1_T2_binom_coef_sd ;
 
+	locat_cholfaccorr = lkj_corr_cholesky_rng(nXc,1.0) ;
 
-}
-generated quantities{
-	// T1_T2_Y_gauss_rep: posterior-predictive observations modelled with location-scale Gaussian model
-	matrix[nY,2] T1_T2_Y_gauss_rep ;
+	for(x in 1:nXc){
+		T1_T2_locat_cors[x] = uniform_rng(0,1) ; //commented-out bc implied by bounds
+		locat_scale_cors[x] = uniform_rng(-1,1) ; //commented-out bc implied by bounds
+		locat_binom_cors[x] = uniform_rng(-1,1) ; //commented-out bc implied by bounds
+	}
 
-	// T1_T2_Y_binom_rep: posterior-predictive observations modelled with binomial model
-	array[nY,2] int<lower=0,upper=1> T1_T2_Y_binom_rep ;
-
-	{
-		// corStdNorms from cors & std-normal ----
-		matrix[nXc,nI] locat_icoef_common_corStdNorms = (
-			locat_cholfaccorr
-			* locat_icoef_common_std_normals
-		) ;
-
-		// locat T1-T2 SEM
-		array[2] matrix[nXc,nI] T1_T2_locat_icoef_corStdNorms = sem_var0_to_var1_var2(
-			locat_icoef_common_corStdNorms // std_normal_var0
-			, T1_T2_locat_cors // cors
-			, T1_T2_locat_icoef_unique_std_normals // std_normal_var1_var2_unique
-		) ;
-
-		// prep to loop over time
-		array[2] matrix[nXc,nI] T1_T2_locat_icoef ;
-		array[2] matrix[nXc,nI] T1_T2_scale_icoef ;
-		array[2] matrix[nXc,nI] T1_T2_binom_icoef ;
-		matrix[2,rXc] T1_T2_locat_icond ;
-		matrix[2,rXc] T1_T2_scale_icond ;
-		matrix[2,rXc] T1_T2_binom_icond ;
-
-		// loop over time
-		for(t in 1:2){
-			// locat just needs shift & scale
-			T1_T2_locat_icoef[t] = shift_and_scale_cols(
-				T1_T2_locat_icoef_corStdNorms[t] // std_normal_vals
-				, append_row( T1_T2_locat_intercept_mean[t] , T1_T2_locat_coef_mean[,t] ) // shift
-				, append_row( T1_T2_locat_intercept_sd[t]   , T1_T2_locat_coef_sd[,t] ) // scale
-			) ;
-			// scale needs SEM from locat, then shift & scale
-			T1_T2_scale_icoef[t] = shift_and_scale_cols(
-				sem_var1_to_var2(
-					T1_T2_locat_icoef_corStdNorms[t] // std_normal_var1
-					, locat_scale_cors // cors
-					, T1_T2_scale_icoef_unique_std_normals[t] // std_normal_var2_unique
-				) // std_normal_vals
-				, append_row( T1_T2_scale_intercept_mean[t] , T1_T2_scale_coef_mean[,t] ) // shift
-				, append_row( T1_T2_scale_intercept_sd[t]   , T1_T2_scale_coef_sd[,t] ) // scale
-			) ;
-			// binom needs SEM from locat, then shift & scale
-			T1_T2_binom_icoef[t] = shift_and_scale_cols(
-				sem_var1_to_var2(
-					T1_T2_locat_icoef_corStdNorms[t] // std_normal_var1
-					, locat_binom_cors // cors
-					, T1_T2_binom_icoef_unique_std_normals[2] // std_normal_var2_unique
-				) // std_normal_vals
-				, append_row( T1_T2_binom_intercept_mean[t] , T1_T2_binom_coef_mean[,t] ) // shift
-				, append_row( T1_T2_binom_intercept_sd[t]   , T1_T2_binom_coef_sd[,t] ) // binom
-			) ;
-			// dot products to go from coef to cond
-			T1_T2_locat_icond[t,] = columns_dot_product(  T1_T2_locat_icoef[t][,iXc] , Xct ) ;
-			T1_T2_scale_icond[t,] = sqrt(exp(columns_dot_product( T1_T2_scale_icoef[t][,iXc] , Xct ))) ;
-			T1_T2_binom_icond[t,] = columns_dot_product( T1_T2_binom_icoef[t][,iXc] , Xct ) ;
-
-			for(i_nY in 1:nY){
-				T1_T2_Y_gauss_rep[i_nY,t] = normal_rng(
-					T1_T2_locat_icond[t,yXc[i_nY]]
-					, T1_T2_scale_icond[t,yXc[i_nY]]
-				) ;
-				T1_T2_Y_binom_rep[i_nY,t] = bernoulli_logit_rng(
-					T1_T2_binom_icond[t,yXc[i_nY]]
-				) ;
+	for(t in 1:2){
+		T1_T2_locat_intercept_mean[t] = std_normal_rng() ;
+		T1_T2_scale_intercept_mean[t] = std_normal_rng() ;
+		T1_T2_binom_intercept_mean[t] = std_normal_rng() ;
+		T1_T2_locat_intercept_sd[t] = weibull_rng(2,1) ;
+		T1_T2_scale_intercept_sd[t] = weibull_rng(2,1) ;
+		T1_T2_binom_intercept_sd[t] = weibull_rng(2,1) ;
+		for(x in 1:nXc){
+			for(i in 1:nI){
+				locat_icoef_common_std_normals[x,i] = std_normal_rng() ;
+				T1_T2_locat_icoef_unique_std_normals[t][x,i] = std_normal_rng() ;
+				T1_T2_scale_icoef_unique_std_normals[t][x,i] = std_normal_rng() ;
+				T1_T2_binom_icoef_unique_std_normals[t][x,i] = std_normal_rng() ;
 			}
-
+			if(x<nXc){
+				T1_T2_locat_coef_mean[x,t] = std_normal_rng() ;
+				T1_T2_scale_coef_mean[x,t] = std_normal_rng() ;
+				T1_T2_binom_coef_mean[x,t] = std_normal_rng() ;
+				T1_T2_locat_coef_sd[x,t] = weibull_rng(2,1) ;
+				T1_T2_scale_coef_sd[x,t] = weibull_rng(2,1) ;
+				T1_T2_binom_coef_sd[x,t] = weibull_rng(2,1) ;
+			}
 		}
+	}
 
+	vector[(nXc*(nXc-1))%/%2] locat_cors = flatten_lower_tri(multiply_lower_tri_self_transpose(locat_cholfaccorr)) ;
+	real locat_intercept_mean = mean(T1_T2_locat_intercept_mean) ;
+	real scale_intercept_mean = mean(T1_T2_scale_intercept_mean) ;
+	real binom_intercept_mean = mean(T1_T2_binom_intercept_mean) ;
+	vector[nXc-1] locat_coef_mean ;
+	vector[nXc-1] scale_coef_mean ;
+	vector[nXc-1] binom_coef_mean ;
+	for(x in 1:(nXc-1)){
+		locat_coef_mean[x] = mean(T1_T2_locat_coef_mean[x,]);
+		scale_coef_mean[x] = mean(T1_T2_scale_coef_mean[x,]);
+		binom_coef_mean[x] = mean(T1_T2_binom_coef_mean[x,]);
 	}
 
 }

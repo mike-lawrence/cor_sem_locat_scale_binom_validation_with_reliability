@@ -1,43 +1,72 @@
 cat('sample_mod() now available as a function\n')
 sample_mod = function(
-	data = data_for_stan
+	data
 	, mod
-	, chains = parallel::detectCores()/2
-	, max_treedepth = 10
-	, metric = 'dense_e' # 'diag_e' is default; 'dense_e' is slower but yields better sampling of a wider variety of posterior geometries
-	, iter_warmup = 1e4 #1e4 gives greater-than-default confidence in warmup sufficiency
-	, iter_sampling = 1e3 # 1e3 is nearly always a good value
-	, refresh_perc = 10
-	, init = 2 # default of 2 is good for Gaussian likelihoods, lower may be necessary for binomial
-	# values derived from the above
-	, parallel_chains = chains
-	, refresh = round((iter_warmup+iter_sampling)/refresh_perc)
+	, preset = c('frugal','thorough')
+	, ...
 ){
+	if(	length(...names())>0){
+		usr_dots = list(...)
+		names(usr_dots) = ...names()
+	}else{
+		usr_dots = NULL
+	}
+	if(!(preset[1] %in% c('frugal','thorough'))){
+		stop(paste0('"',preset[1],'" is not a valid preset. Valid presets include "frugal" & "thorough" only.'))
+	}
+	if(length(preset)>0){
+		preset = preset[1]
+		cat(crayon::cyan(paste0('Using preset "',preset,'"\n')))
+	}
 	sampling_config = lst(
-		data = data_for_stan
-		, mod = mod
-		, chains = chains
-		, max_treedepth = max_treedepth
-		, metric = metric
-		, iter_warmup = iter_warmup
-		, iter_sampling = iter_sampling
-		, refresh_perc = refresh_perc
-		, init = init
-		, draws_sampling = iter_sampling*chains
-		, parallel_chains = parallel_chains
-		, refresh = refresh
+		data = data
+		, chains = parallel::detectCores()/2
+		, parallel_chains = chains
+		, iter_warmup = 1e3
+		, iter_sampling = 1e3
+		, percent = 10
+		, max_treedepth = 10
 	)
-	post = mod$sample(
-		data = sampling_config$data
-		, chains = sampling_config$chains
-		, parallel_chains = sampling_config$parallel_chains
-		, max_treedepth = sampling_config$max_treedepth
-		, metric = sampling_config$metric
-		, iter_warmup = sampling_config$iter_warmup
-		, iter_sampling = sampling_config$iter_sampling
-		, refresh = sampling_config$refresh
-		, init = sampling_config$init
-	)
+	if(preset=='thorough'){
+		sampling_config %<>% (
+			.
+			%>% list_modify(
+				max_treedepth = 12
+				, metric = 'dense_e'
+				, iter_warmup = 1e4
+				, sig_figs = 18
+				, save_warmup = T
+				, save_latent_dynamics = T
+			)
+		)
+
+	}
+	#now update to account for dots
+	if(!is.null(usr_dots)){
+		sampling_config %<>% list_modify(usr_dots)
+	}
+	if(!('refresh'%in%names(sampling_config))){
+		sampling_config$refresh = ifelse(
+			sampling_config$percent==0
+			, 1
+			, ifelse(
+				is.infinite(sampling_config$percent)
+				, 0
+				, round((sampling_config$iter_warmup+sampling_config$iter_sampling)*(sampling_config$percent/100))
+			)
+		)
+	}
+	sampling_config %<>% list_modify(percent=zap())
+	if(!('output_dir'%in%names(sampling_config))){
+		ramdisk_path = getOption('ramdisk_path')
+		if(!is.null(ramdisk_path)){
+			sampling_config$output_dir = ramdisk_path
+		}else{
+			sampling_config$output_dir = 'stan_sample_csvs'
+		}
+	}
+	fs::dir_create(sampling_config$output_dir)
+	post = do.call(mod$sample,sampling_config)
 	attr(post,"sampling_config")=sampling_config
 	return(post)
 }
