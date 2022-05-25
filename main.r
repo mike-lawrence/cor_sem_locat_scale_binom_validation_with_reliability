@@ -132,7 +132,7 @@ data_for_stan = lst(
 	# int<lower=nXc> rXc ;
 	, rXc = nrow(Xc)
 
-	# nY: num entries in the LA observation vector
+	# nY: num entries in the observation vector
 	# int nY ;
 	, nY = nrow(T1_T2_Y_gauss)
 
